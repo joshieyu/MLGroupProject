@@ -57,6 +57,6 @@ def evaluate(model, dataset, save_dir="denoised_outputs", sample_rate=16000, dev
             # Save output as a waveform with shape [1, time]
             filename = os.path.join(save_dir, f"denoised_{i}.wav")
             torchaudio.save(filename, waveform, sample_rate)  # [1, time] shape
-            print(f"🔊 Saved: {filename}")
+            print(f"Saved: {filename}")
 
 
