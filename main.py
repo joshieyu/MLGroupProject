@@ -10,8 +10,8 @@ import glob # Import glob
 import argparse
 
 
-def train(model, train_loader, num_epochs=20, device=None, lr=1e-3, checkpoint_interval=5, step_size=10, gamma=0.5):
-    criterion = torch.nn.L1Loss()  # Use L1 loss for denoising
+def train(model, train_loader, num_epochs=50, device=None, lr=1e-3, checkpoint_interval=5, step_size=10, gamma=0.5):
+    l1 = torch.nn.L1Loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     # Learning rate scheduler
@@ -21,13 +21,16 @@ def train(model, train_loader, num_epochs=20, device=None, lr=1e-3, checkpoint_i
 
     for epoch in range(num_epochs):
         running_loss = 0.0
-        for noisy_spec, clean_spec in train_loader:
+        for noisy_spec, clean_spec, *_ in train_loader:
             noisy_spec, clean_spec = noisy_spec.to(device), clean_spec.to(device)
 
             # Zero gradients, perform backward pass, update weights
             optimizer.zero_grad()
             output = model(noisy_spec)
-            loss = criterion(output, clean_spec)
+            loss = (
+                    0.7 * l1(output, clean_spec) +
+                    0.3 * log_cosh_loss(output, clean_spec)
+            )
             loss.backward()
             optimizer.step()
 
@@ -44,6 +47,12 @@ def train(model, train_loader, num_epochs=20, device=None, lr=1e-3, checkpoint_i
         print(f"Current Learning Rate: {current_lr:.6f}")
     
     return model
+
+def log_cosh_loss(x, y):
+    diff = x - y
+    diff = torch.clamp(diff, min=-10, max=10)  # avoid exploding gradients
+    return torch.mean(torch.log(torch.cosh(diff + 1e-12)))
+
 
 def load_model(model_path, device='cpu'):
     # Initialize the model architecture
