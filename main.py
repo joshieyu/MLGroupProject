@@ -96,7 +96,7 @@ def run_model(do_train, device, noisy_dir=None, output_base_dir=None, model_path
         model = UNetAutoencoder2D().to(device)
 
         print("Training model...")
-        model = train(model, dataloader, num_epochs=50, device=device) # Adjust epochs as needed
+        model = train(model, dataloader, num_epochs=35, device=device) # Adjust epochs as needed
 
         torch.save(model.state_dict(), model_path)
         print(f"Model saved as '{model_path}'")

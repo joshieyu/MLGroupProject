@@ -43,7 +43,7 @@ def denoise_and_save(model, noisy_path, out_path, sample_rate=TARGET_SAMPLE_RATE
     input_tensor = mel_spec.unsqueeze(0)
 
     # --- Optional: Add padding for time dimension if model requires exact size ---
-    target_time_bins = 1024 # Example from dataset.py
+    target_time_bins = 512 # Example from dataset.py
     current_time_bins = input_tensor.shape[3]
     if current_time_bins < target_time_bins:
         pad_time = target_time_bins - current_time_bins
@@ -67,7 +67,13 @@ def denoise_and_save(model, noisy_path, out_path, sample_rate=TARGET_SAMPLE_RATE
     # Use N_FFT consistent with the forward transform
     inverse_mel = torchaudio.transforms.InverseMelScale(n_stft=N_FFT // 2 + 1, n_mels=N_MELS, sample_rate=sr)
     # GriffinLim needs n_fft and hop_length consistent with forward transform
-    griffin_lim = torchaudio.transforms.GriffinLim(n_fft=N_FFT, hop_length=HOP_LENGTH)
+    # in evaluate.py (or infer.py)
+    griffin_lim = torchaudio.transforms.GriffinLim(
+        n_fft=1024,
+        hop_length=256,
+        n_iter=128,  # bump from 32 or 64 up to 128 or 256
+        power=1.0  # ensure you’re using magnitude, not power
+    )
 
     # Apply inverse transforms
     # Ensure output_spec_amp has the correct shape [n_mels, time]
