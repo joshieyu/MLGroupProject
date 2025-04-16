@@ -48,6 +48,10 @@ class AudioDenoiseDataset(Dataset):
         clean_spec = self.transform(clean)  # shape: [1, n_mels, T]
         noisy_spec = self.transform(noisy)
 
+        #Normalize
+        clean_spec = (clean_spec + 80) / 80  # Map from [-80, 0] to [0, 1]
+        noisy_spec = (noisy_spec + 80) / 80
+
         # Standardize the time dimension of spectrograms
         clean_spec = self.crop_or_pad_spec(clean_spec)
         noisy_spec = self.crop_or_pad_spec(noisy_spec)

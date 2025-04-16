@@ -8,12 +8,19 @@ from infer import denoise_and_save
 import argparse
 
 
-def train(model, train_loader, num_epochs=20, device=None, lr=1e-3, checkpoint_interval=5, step_size=10, gamma=0.5):
-    criterion = torch.nn.L1Loss()  # Use L1 loss for denoising
+def train(model, train_loader, num_epochs=50, device=None, lr=1e-3, checkpoint_interval=5, step_size=10, gamma=0.5):
+    l1 = torch.nn.L1Loss()
+    mse = torch.nn.MSELoss()
+
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     # Learning rate scheduler
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=gamma)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode='min',
+        factor=0.5,  # Reduce LR by this factor
+        patience=3,  # Wait N epochs with no improvement
+    )
 
     model.train()
 
@@ -25,7 +32,11 @@ def train(model, train_loader, num_epochs=20, device=None, lr=1e-3, checkpoint_i
             # Zero gradients, perform backward pass, update weights
             optimizer.zero_grad()
             output = model(noisy_spec)
-            loss = criterion(output, clean_spec)
+            loss = (
+                    0.5 * l1(output, clean_spec) +
+                    0.3 * mse(output, clean_spec) +
+                    0.2 * log_cosh_loss(output, clean_spec)
+            )
             loss.backward()
             optimizer.step()
 
@@ -35,13 +46,15 @@ def train(model, train_loader, num_epochs=20, device=None, lr=1e-3, checkpoint_i
         print(f"Epoch {epoch+1}/{num_epochs}, Loss: {avg_loss:.4f}")
 
         # Step the scheduler to update the learning rate
-        scheduler.step()
+        scheduler.step(avg_loss)
 
         # Print the current learning rate
-        current_lr = optimizer.param_groups[0]['lr']
-        print(f"Current Learning Rate: {current_lr:.6f}")
+        print(f"Current Learning Rate: {scheduler.get_last_lr()[0]:.6f}")
     
     return model
+
+def log_cosh_loss(x, y):
+    return torch.mean(torch.log(torch.cosh(x - y + 1e-12)))
 
 def load_model(model_path, device='cpu'):
     # Initialize the model architecture
@@ -61,7 +74,7 @@ def run_model(do_train, device):
     
     print("Loading dataset...")
     dataset = AudioDenoiseDataset("data/clean", "data/noisy")
-    dataloader = DataLoader(dataset, batch_size=8, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
     
     if do_train:
         # Step 3: Initialize model and move to device

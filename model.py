@@ -87,7 +87,7 @@ class UNetAutoencoder2D(nn.Module):
         )
         self.dec1 = nn.Sequential(
             nn.ConvTranspose2d(48, 1, kernel_size=4, stride=2, padding=1),  # 32 (d2) + 16 (e1) -> [B, 1, H, W]
-            nn.Sigmoid()  # Use sigmoid if spectrograms are normalized to [0, 1]
+            # nn.Sigmoid()  # Use sigmoid if spectrograms are normalized to [0, 1]
         )
 
     def center_crop(self, enc_feat, dec_feat):

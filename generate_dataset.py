@@ -10,7 +10,7 @@ def add_noise(waveform, noise_level=0.05):
     return torch.clamp(noisy, -1.0, 1.0)
 
 def save_librispeech_clean_noisy(
-    root="data", subset="train-clean-100", noise_level=0.05, max_samples=None
+    root="data", subset="train-clean-100", noise_level=0.1, max_samples=None
 ):
     print("Downloading LibriSpeech...")
     dataset = LIBRISPEECH(root=root, url=subset, download=True)
