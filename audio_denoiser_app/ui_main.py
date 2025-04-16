@@ -232,6 +232,9 @@ class MainWindow(QWidget):
         self.set_media(self._temp_output)
         self.file_label.setText("(Denoised) " + os.path.basename(self.file_path))
 
+        # Enable the download button
+        self.download_btn.setEnabled(True)
+
     def download_file(self):
         if not os.path.exists(self.output_path):
             QMessageBox.warning(self, "No file", "You haven't denoised a file yet.")
