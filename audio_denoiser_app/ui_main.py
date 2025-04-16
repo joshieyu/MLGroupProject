@@ -2,11 +2,21 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSlider,
     QFileDialog, QMessageBox, QSizePolicy, QApplication
 )
-from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput, QMediaDevices
 from PyQt6.QtCore import QUrl, QTimer, Qt
 from PyQt6.QtGui import QIcon
 import os
 
+import os
+import tempfile
+import torchaudio
+
+def make_pcm16(src_path: str) -> str:
+    waveform, sr = torchaudio.load(src_path)
+    fd, out_path = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+    torchaudio.save(out_path, waveform, sr, encoding="PCM_S", bits_per_sample=16)
+    return out_path
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -18,8 +28,15 @@ class MainWindow(QWidget):
         self.output_path = "denoised_output.wav"
 
         self.player = QMediaPlayer()
-        self.audio_output = QAudioOutput()
-        self.audio_output.setVolume(50)
+
+        # explicitly grab the default audio device
+        default_audio_dev = QMediaDevices.defaultAudioOutput()
+        self.audio_output = QAudioOutput(default_audio_dev)
+
+        # volume is a float 0.0–1.0
+        self.audio_output.setVolume(1)
+
+        # wire up the player to it
         self.player.setAudioOutput(self.audio_output)
 
         # === Layouts ===
@@ -144,25 +161,28 @@ class MainWindow(QWidget):
         """)
 
     def select_file(self):
-        desktop_dir = os.path.join(os.path.expanduser("~"), "Desktop")
-        path, _ = QFileDialog.getOpenFileName(self, "Select Audio", desktop_dir, "Audio (*.mp3 *.wav)")
-        
-        if path:
-            self.file_path = path
-            self.set_media(path)
-            self.file_label.setText(os.path.basename(path))
+        # Ask user
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select Audio", os.path.expanduser("~/Desktop"), "Audio (*.wav *.mp3)"
+        )
+        if not path:
+            return
 
-            # Enable UI elements
-            self.play_btn.setEnabled(True)
-            self.progress.setEnabled(True)
-            self.denoise_btn.setEnabled(True)
-            self.time_label.setEnabled(True)
+        self.file_path = path
+        # Transcode to 16‑bit
+        self._temp_input = make_pcm16(path)
+        self.set_media(self._temp_input)
 
-            # Reset time & progress
-            self.progress.setValue(0)
-            self.time_label.setText("0:00 / 0:00")
+        self.file_label.setText(os.path.basename(path))
+        self.play_btn.setEnabled(True)
+        self.progress.setEnabled(True)
+        self.denoise_btn.setEnabled(True)
+        self.time_label.setEnabled(True)
+        self.progress.setValue(0)
+        self.time_label.setText("0:00 / 0:00")
 
     def set_media(self, path):
+        # Always point the player at a PCM16 file
         self.player.setSource(QUrl.fromLocalFile(path))
         self.play_btn.setIcon(QIcon.fromTheme("media-playback-start"))
 
@@ -192,21 +212,25 @@ class MainWindow(QWidget):
         return f"{s//60}:{s%60:02}"
 
     def denoise_audio(self):
-        from controller import denoise_audio
+        from controller import denoise_audio  # This runs your model under the hood
+        from ui_main import make_pcm16  # This converts the .wav to PCM16 for Qt
 
         self.status_label.setText("Denoising...")
         self.status_label.setVisible(True)
         QApplication.processEvents()
 
+        # Call your model via controller.py (which saves to self.output_path)
         denoise_audio(self.file_path, self.output_path)
 
+        # 🔧 Transcode the denoised output to 16-bit PCM so Qt can play it
+        self._temp_output = make_pcm16(self.output_path)
+
         self.status_label.setVisible(False)
-        QMessageBox.information(self, "Success", "Denoised (placeholder).")
-        self.set_media(self.output_path)
+        QMessageBox.information(self, "Success", "Denoised successfully.")
+
+        # Set this for playback
+        self.set_media(self._temp_output)
         self.file_label.setText("(Denoised) " + os.path.basename(self.file_path))
-        
-		# Enable UI elements
-        self.download_btn.setEnabled(True)
 
     def download_file(self):
         if not os.path.exists(self.output_path):

@@ -43,7 +43,7 @@ def denoise_and_save(model, noisy_path, out_path, sample_rate=TARGET_SAMPLE_RATE
     input_tensor = mel_spec.unsqueeze(0)
 
     # --- Optional: Add padding for time dimension if model requires exact size ---
-    target_time_bins = 128 # Example from dataset.py
+    target_time_bins = 1024 # Example from dataset.py
     current_time_bins = input_tensor.shape[3]
     if current_time_bins < target_time_bins:
         pad_time = target_time_bins - current_time_bins
